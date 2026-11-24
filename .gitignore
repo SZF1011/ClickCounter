@@ -1,0 +1,17 @@
+dist/
+*.pdb
+selftest.txt
+crash.txt
+
+# 构建脚本中间产物与 IDE 文件
+/build/
+/.vs/
+*.user
+*.suo
+
+# 本机 agent 环境说明，不对外发布
+/AGENTS.md
+
+# 测试运行产生的临时数据
+*.tmp
+/tests/uicheck*/
