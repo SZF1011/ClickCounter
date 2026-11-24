@@ -1,0 +1,24 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建（csc / .NET Framework 4.8）
+        shell: cmd
+        run: build.cmd
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClickCounter
+          path: dist/ClickCounter.exe
+          if-no-files-found: error
