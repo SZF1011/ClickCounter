@@ -231,17 +231,16 @@ namespace KeyRank
             Theme.FillRound(g, r, 16, Theme.Card);
             Theme.StrokeRound(g, r, 16, Theme.Stroke);
 
-            string[] labels = new string[] { "总点击", "今日", "鼠标占比", "滚轮" };
+            string[] labels = new string[] { "今日", "鼠标占比", "滚轮" };
             string[] values = new string[]
             {
-                Total.ToString("N0"),
                 Today.ToString("N0"),
                 MousePercent.ToString("0.0") + "%",
                 Wheel.ToString("N0")
             };
 
-            int colW = Width / 4;
-            for (int i = 0; i < 4; i++)
+            int colW = Width / 3;
+            for (int i = 0; i < 3; i++)
             {
                 Rectangle cell = new Rectangle(i * colW, 0, colW, Height);
                 int labelH = (int)(Height * 0.2);

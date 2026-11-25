@@ -270,7 +270,7 @@ namespace KeyRank
             try
             {
                 StatsStore store = new StatsStore(StatsStore.DefaultDataDir());
-                ok = store.ExportCsv(path, out error);
+                ok = HasArg(args, "--today") ? store.ExportTodayCsv(path, out error) : store.ExportCsv(path, out error);
             }
             catch (Exception ex)
             {

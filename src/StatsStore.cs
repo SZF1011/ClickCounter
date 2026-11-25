@@ -185,6 +185,94 @@ namespace KeyRank
             }
         }
 
+        public void GetTodaySummary(out long todayCount, out long todayMouseCount, out long todayWheelCount)
+        {
+            lock (gate)
+            {
+                RollDayLocked();
+
+                long mouse = 0;
+                foreach (KeyValuePair<string, long> kv in todayByKey)
+                {
+                    if (kv.Key == "M_L" || kv.Key == "M_R") mouse += kv.Value;
+                }
+
+                todayCount = today - todayWheel;
+                todayMouseCount = mouse;
+                todayWheelCount = todayWheel;
+            }
+        }
+
+        public List<KeyStat> BuildTodayRows(bool includeKeyboard, bool includeMouse, bool includeWheel, string query)
+        {
+            lock (gate)
+            {
+                RollDayLocked();
+
+                List<KeyStat> rows = new List<KeyStat>(todayByKey.Count);
+                foreach (KeyValuePair<string, long> kv in todayByKey)
+                {
+                    if (kv.Value <= 0) continue;
+                    HitKind kind = KeyCatalog.KindOf(kv.Key);
+                    if (kind == HitKind.Mouse && !includeMouse) continue;
+                    if (kind == HitKind.Wheel && !includeWheel) continue;
+                    if (kind == HitKind.Keyboard && !includeKeyboard) continue;
+
+                    string label = KeyCatalog.Label(kv.Key);
+                    if (!string.IsNullOrEmpty(query))
+                    {
+                        bool match = label.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
+                        if (!match) match = kv.Key.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!match) continue;
+                    }
+
+                    KeyStat s = new KeyStat();
+                    s.Id = kv.Key;
+                    s.Label = label;
+                    s.Kind = kind;
+                    s.Count = kv.Value;
+                    rows.Add(s);
+                }
+                rows.Sort(CompareRows);
+                return rows;
+            }
+        }
+
+        public bool ExportTodayCsv(string path, out string error)
+        {
+            error = null;
+            try
+            {
+                List<KeyStat> rows = BuildTodayRows(true, true, true, null);
+                long todayCount;
+                long todayMouse;
+                long todayWheel;
+                GetTodaySummary(out todayCount, out todayMouse, out todayWheel);
+
+                StringBuilder sb = new StringBuilder(rows.Count * 32 + 96);
+                sb.AppendLine("名次,按键,类型,次数,占比");
+                int rank = 1;
+                foreach (KeyStat s in rows)
+                {
+                    long baseTotal = s.Kind == HitKind.Wheel ? todayWheel : todayCount;
+                    double pct = baseTotal > 0 ? (s.Count * 100.0 / baseTotal) : 0.0;
+                    sb.Append(rank.ToString(CultureInfo.InvariantCulture)).Append(',');
+                    sb.Append(CsvField(s.Label)).Append(',');
+                    string kindText = s.Kind == HitKind.Mouse ? "鼠标" : (s.Kind == HitKind.Wheel ? "滚轮" : "键盘");
+                    sb.Append(kindText).Append(',');
+                    sb.Append(s.Count.ToString(CultureInfo.InvariantCulture)).Append(',');
+                    sb.Append(pct.ToString("0.0", CultureInfo.InvariantCulture)).AppendLine("%");
+                    rank++;
+                }
+                return FileExport.WriteTextFile(path, sb.ToString(), dataDir, out error);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
         public List<KeyStat> BuildRows(bool includeKeyboard, bool includeMouse, bool includeWheel, string query)
         {
             lock (gate)

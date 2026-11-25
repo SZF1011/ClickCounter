@@ -20,6 +20,7 @@ namespace KeyRank
         readonly PillButton prevButton;
         readonly PillButton nextButton;
         readonly PillButton todayButton;
+        readonly PillButton totalButton;
         readonly PillButton exportButton;
         readonly PillButton closeButton;
         readonly RankList list;
@@ -27,6 +28,7 @@ namespace KeyRank
         readonly List<DateTime> days = new List<DateTime>();
 
         DateTime currentDay;
+        bool showingTotal;
         long lastTotal = -1;
         float uiScale = 1f;
 
@@ -63,6 +65,8 @@ namespace KeyRank
             nextButton.Click += delegate { Navigate(1); };
             todayButton = NewButton("今天", "回到今天");
             todayButton.Click += delegate { LoadDay(DateTime.Today); };
+            totalButton = NewButton("累计", "查看全部时间的排行");
+            totalButton.Click += delegate { ShowTotal(); };
             exportButton = NewButton("导出 CSV", "导出这一天的排行");
             exportButton.Click += delegate { ExportDay(); };
             closeButton = NewButton("关闭", "关闭窗口");
@@ -77,6 +81,7 @@ namespace KeyRank
             Controls.Add(nextButton);
             Controls.Add(dateLabel);
             Controls.Add(todayButton);
+            Controls.Add(totalButton);
             Controls.Add(exportButton);
             Controls.Add(list);
             Controls.Add(statusLabel);
@@ -89,6 +94,7 @@ namespace KeyRank
             timer.Interval = 1000;
             timer.Tick += delegate
             {
+                if (showingTotal) return;
                 if (currentDay.Date != DateTime.Today) return;
                 if (store.GetDayTotal(currentDay) == lastTotal) return;
                 LoadDay(currentDay);
@@ -168,12 +174,23 @@ namespace KeyRank
 
             int navY = S(56);
             int navH = S(28);
+
+            int exportW = S(76);
+            int exportX = Math.Max(pad + S(150), w - pad - exportW);
+            int totalW = S(48);
+            int totalX = exportX - S(6) - totalW;
+            int todayW = S(48);
+            int todayX = totalX - S(6) - todayW;
+            int nextX = todayX - S(8) - S(30);
+            int dateX = pad + S(38);
+            int dateW = Math.Max(S(80), nextX - S(6) - dateX);
+
             prevButton.Bounds = new Rectangle(pad, navY, S(30), navH);
-            dateLabel.Bounds = new Rectangle(pad + S(38), navY, Math.Max(S(110), w - pad * 2 - S(240)), navH);
-            int navRight = pad + S(38) + Math.Max(S(110), w - pad * 2 - S(240));
-            nextButton.Bounds = new Rectangle(navRight, navY, S(30), navH);
-            todayButton.Bounds = new Rectangle(navRight + S(34), navY, S(52), navH);
-            exportButton.Bounds = new Rectangle(w - pad - S(80), navY, S(80), navH);
+            dateLabel.Bounds = new Rectangle(dateX, navY, dateW, navH);
+            nextButton.Bounds = new Rectangle(nextX, navY, S(30), navH);
+            todayButton.Bounds = new Rectangle(todayX, navY, todayW, navH);
+            totalButton.Bounds = new Rectangle(totalX, navY, totalW, navH);
+            exportButton.Bounds = new Rectangle(exportX, navY, exportW, navH);
 
             int listTop = S(94);
             int listBottom = h - S(46);
@@ -192,6 +209,12 @@ namespace KeyRank
 
         void Navigate(int direction)
         {
+            if (showingTotal)
+            {
+                LoadDay(currentDay);
+                return;
+            }
+
             if (days.Count == 0)
             {
                 LoadDay(currentDay);
@@ -207,6 +230,7 @@ namespace KeyRank
 
         void LoadDay(DateTime day)
         {
+            showingTotal = false;
             currentDay = day.Date;
             List<KeyStat> rows;
             long total;
@@ -234,14 +258,33 @@ namespace KeyRank
             nextButton.Enabled = true;
         }
 
+        void ShowTotal()
+        {
+            showingTotal = true;
+            List<KeyStat> rows = store.BuildRows(true, true, false, null);
+            long total;
+            long today;
+            long mouse;
+            long wheel;
+            long todayWheel;
+            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
+
+            list.SetItems(rows, total);
+            lastTotal = total;
+            dateLabel.Text = "累计 · 全部时间";
+            statusLabel.Text = string.Format("总点击 {0:N0} 次 · 滚轮 {1:N0} · {2} 个按键", total, wheel, rows.Count);
+        }
+
         void ExportDay()
         {
-            string suggested = Path.Combine(store.DataDir, "历史排行_" + currentDay.ToString("yyyyMMdd") + ".csv");
+            string suggested = Path.Combine(store.DataDir,
+                (showingTotal ? "累计排行_" : "历史排行_") + currentDay.ToString("yyyyMMdd") + ".csv");
             string chosen;
-            if (!SaveAsForm.Ask(this, "导出历史排行", suggested, out chosen)) return;
+            if (!SaveAsForm.Ask(this, showingTotal ? "导出累计排行" : "导出历史排行", suggested, out chosen)) return;
 
             string error;
-            if (store.ExportDayCsv(currentDay, chosen, out error))
+            bool ok = showingTotal ? store.ExportCsv(chosen, out error) : store.ExportDayCsv(currentDay, chosen, out error);
+            if (ok)
             {
                 statusLabel.Text = "已导出：" + chosen;
                 return;

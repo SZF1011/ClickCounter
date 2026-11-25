@@ -373,25 +373,21 @@ namespace KeyRank
             }
             Program.TryLog("tray available=" + trayAvailable);
 
-            long total;
             long today;
-            long mouse;
-            long wheel;
+            long todayMouse;
             long todayWheel;
-            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
-            UpdateTrayText(total, today, mouse);
+            store.GetTodaySummary(out today, out todayMouse, out todayWheel);
+            UpdateTrayText(today, todayMouse);
         }
 
         void OnTick(object sender, EventArgs e)
         {
-            long total;
             long today;
-            long mouse;
-            long wheel;
+            long todayMouse;
             long todayWheel;
-            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
+            store.GetTodaySummary(out today, out todayMouse, out todayWheel);
 
-            if (total != lastTotal || mouse != lastMouse || wheel != lastWheel) RefreshRows();
+            if (today != lastTotal || todayMouse != lastMouse || todayWheel != lastWheel) RefreshRows();
 
             if (store.IsDirty)
             {
@@ -413,57 +409,55 @@ namespace KeyRank
             bool showMouse = filter == 0 || filter == 2;
             bool showWheel = filter == 3;
 
-            long total;
             long today;
-            long mouse;
-            long wheel;
+            long todayMouse;
             long todayWheel;
-            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
+            store.GetTodaySummary(out today, out todayMouse, out todayWheel);
 
-            List<KeyStat> rows = store.BuildRows(showKeyboard, showMouse, showWheel, search.Query);
+            List<KeyStat> rows = store.BuildTodayRows(showKeyboard, showMouse, showWheel, search.Query);
             if (rows.Count == 0)
             {
-                if (total == 0) list.SetEmptyMessage("还没有记录", "敲键盘、点鼠标，这里会实时排名");
+                if (today == 0 && todayWheel == 0) list.SetEmptyMessage("今天还没有记录", "敲键盘、点鼠标，这里会实时排名");
                 else if (search.Query.Length > 0) list.SetEmptyMessage("没有匹配的按键", "换个关键词试试");
-                else list.SetEmptyMessage("这个分类还没有记录", "切换筛选看看其他按键");
+                else list.SetEmptyMessage("今天这个分类还没有记录", "切换筛选看看其他按键");
             }
 
-            list.SetItems(rows, showWheel ? wheel : total);
-            card.Total = total;
+            list.SetItems(rows, showWheel ? todayWheel : today);
+            card.Total = 0;
             card.Today = today;
-            card.MousePercent = total > 0 ? mouse * 100.0 / total : 0.0;
-            card.Wheel = wheel;
+            card.MousePercent = today > 0 ? todayMouse * 100.0 / today : 0.0;
+            card.Wheel = todayWheel;
             card.TodayWheel = todayWheel;
             card.Invalidate();
 
-            lastTotal = total;
-            lastMouse = mouse;
-            lastWheel = wheel;
+            lastTotal = today;
+            lastMouse = todayMouse;
+            lastWheel = todayWheel;
             lastRows = rows;
-            UpdateFooter(total, today, mouse, wheel);
-            UpdateTrayText(total, today, mouse);
+            UpdateFooter(today, todayMouse, todayWheel);
+            UpdateTrayText(today, todayMouse);
         }
 
-        void UpdateFooter(long total, long today, long mouse, long wheel)
+        void UpdateFooter(long today, long todayMouse, long todayWheel)
         {
             if (paused)
             {
-                SetStatus("已暂停 · 已记录 " + total.ToString("N0") + " 次", false);
+                SetStatus("已暂停 · 今日 " + today.ToString("N0") + " 次", false);
                 return;
             }
-            string text = "已记录 " + total.ToString("N0") + " · 今日 " + today.ToString("N0") +
-                " · 滚轮 " + wheel.ToString("N0");
+            string text = "今日 " + today.ToString("N0") + " · 鼠标 " + todayMouse.ToString("N0") +
+                " · 滚轮 " + todayWheel.ToString("N0");
             SetStatus(text, false);
         }
 
-        void UpdateTrayText(long total, long today, long mouse)
+        void UpdateTrayText(long today, long todayMouse)
         {
             if (tray == null) return;
 
-            string text = (paused ? "已暂停" : "记录中") + " · 总计 " + total.ToString("N0") + " · 今日 " + today.ToString("N0");
+            string text = (paused ? "已暂停" : "记录中") + " · 今日 " + today.ToString("N0");
             if (lastRows != null && lastRows.Count > 0)
             {
-                int percent = total > 0 ? (int)Math.Round(mouse * 100.0 / total) : 0;
+                int percent = today > 0 ? (int)Math.Round(todayMouse * 100.0 / today) : 0;
                 text += "\n" + lastRows[0].Label + " " + lastRows[0].Count.ToString("N0") + " · 鼠标 " + percent + "%";
             }
             if (text.Length > 63) text = text.Substring(0, 63);
@@ -542,10 +536,10 @@ namespace KeyRank
         void ExportCsv()
         {
             string suggested = Path.Combine(store.DataDir,
-                "按键统计_" + DateTime.Now.ToString("yyyyMMdd_HHmm") + ".csv");
+                "今日排行_" + DateTime.Now.ToString("yyyyMMdd") + ".csv");
 
             string chosen;
-            if (!SaveAsForm.Ask(this, "导出按键统计", suggested, out chosen)) return;
+            if (!SaveAsForm.Ask(this, "导出今日排行", suggested, out chosen)) return;
             ExportTo(chosen);
         }
 
@@ -589,7 +583,7 @@ namespace KeyRank
         void ExportTo(string path)
         {
             string error;
-            bool ok = store.ExportCsv(path, out error);
+            bool ok = store.ExportTodayCsv(path, out error);
             if (ok)
             {
                 SetStatus("已导出：" + path, false);
@@ -600,7 +594,7 @@ namespace KeyRank
             if (action == ExportFailureAction.SaveToDataDir)
             {
                 string fallback = Path.Combine(store.DataDir, Path.GetFileName(path));
-                if (store.ExportCsv(fallback, out error)) SetStatus("已导出到数据目录：" + fallback, false);
+                if (store.ExportTodayCsv(fallback, out error)) SetStatus("已导出到数据目录：" + fallback, false);
                 else MessageBox.Show(this, "仍然无法保存：\n" + error, "按键排行榜", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             else if (action == ExportFailureAction.RetryAdmin)
@@ -616,7 +610,7 @@ namespace KeyRank
             {
                 string fullPath = Path.GetFullPath(path);
                 string dataDir = Path.GetFullPath(store.DataDir);
-                string arguments = "--export-csv " + Quote(fullPath) + " --data-dir " + Quote(dataDir);
+                string arguments = "--export-csv " + Quote(fullPath) + " --today --data-dir " + Quote(dataDir);
 
                 ProcessStartInfo info = new ProcessStartInfo(Application.ExecutablePath, arguments);
                 info.UseShellExecute = true;

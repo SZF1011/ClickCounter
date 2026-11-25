@@ -42,6 +42,17 @@ namespace KeyRank
             Check("day total excludes wheel (7)", store.GetDayTotal(DateTime.Today) == 7, "");
             Check("day total incl wheel (12)", store.GetDayTotal(DateTime.Today, true) == 12, "");
 
+            long todayKb, todayMouse, todayWheelOnly;
+            store.GetTodaySummary(out todayKb, out todayMouse, out todayWheelOnly);
+            Check("today summary 7/3/5", todayKb == 7 && todayMouse == 3 && todayWheelOnly == 5,
+                todayKb + "/" + todayMouse + "/" + todayWheelOnly);
+
+            List<KeyStat> todayRows = store.BuildTodayRows(true, true, false, null);
+            long todaySum = 0;
+            foreach (KeyStat s in todayRows) todaySum += s.Count;
+            Check("today rows sum 7 no wheel", todaySum == 7 && todayRows.Count == 2,
+                "sum=" + todaySum + " rows=" + todayRows.Count);
+
             store.Save();
             StatsStore reopened = new StatsStore(dir);
             long t2, td2, m2, w2, tw2;
