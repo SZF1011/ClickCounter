@@ -80,6 +80,14 @@ namespace KeyRank
                 Program.TryLog("log unavailable: " + ex.Message);
             }
 
+            // 旧版本 stats.tsv 没有 daywheel 字段：用当天日志里的事件把「今日滚轮」补回来，
+            // 否则升级当天「今日」会短暂地把滚轮算进键盘+鼠标。
+            if (!store.HasDayWheelField && inputLog != null)
+            {
+                try { store.ApplyTodayWheelBaseline(inputLog.CountKind(DateTime.Today, HitKind.Wheel)); }
+                catch { }
+            }
+
             hook = new InputHook();
             hook.Hit += delegate(KeyHit hit)
             {

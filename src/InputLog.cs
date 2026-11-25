@@ -142,6 +142,36 @@ namespace KeyRank
             return Path.Combine(dir, "events-" + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ".tsv");
         }
 
+        public long CountKind(DateTime day, HitKind kind)
+        {
+            long count = 0;
+            try
+            {
+                Flush();
+                string path = PathFor(day.Date);
+                if (!File.Exists(path)) return 0;
+
+                using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (StreamReader reader = new StreamReader(fs, Encoding.UTF8))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        if (line.Length == 0 || line[0] == '#') continue;
+                        int tab = line.IndexOf('\t');
+                        if (tab <= 0 || tab + 1 >= line.Length) continue;
+                        string id = line.Substring(tab + 1).Trim();
+                        if (id.Length == 0) continue;
+                        if (KeyCatalog.KindOf(id) == kind) count++;
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return count;
+        }
+
         public bool ExportBuckets(string path, out string error, out int rows)
         {
             error = null;

@@ -34,6 +34,20 @@ namespace KeyRank
         public string FilePath { get { return filePath; } }
         public string LoadWarning { get { return loadWarning; } }
         public string LastError { get; private set; }
+        public bool HasDayWheelField { get; private set; }
+
+        public void ApplyTodayWheelBaseline(long count)
+        {
+            lock (gate)
+            {
+                if (HasDayWheelField) return;
+                if (count < 0) count = 0;
+                if (count > today) count = today;
+                todayWheel = count;
+                HasDayWheelField = true;
+                dirty = true;
+            }
+        }
 
         public bool IsDirty
         {
@@ -47,6 +61,7 @@ namespace KeyRank
             filePath = Path.Combine(dataDir, "stats.tsv");
             historyDir = Path.Combine(dataDir, "history");
             day = DateTime.Today;
+            HasDayWheelField = true;
             Load();
         }
 
@@ -555,6 +570,7 @@ namespace KeyRank
         void Load()
         {
             if (!File.Exists(filePath)) return;
+            HasDayWheelField = false;
 
             try
             {
@@ -582,6 +598,7 @@ namespace KeyRank
                     }
                     else if (key == "daywheel")
                     {
+                        HasDayWheelField = true;
                         long n;
                         if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) loadedTodayWheel = n;
                     }
