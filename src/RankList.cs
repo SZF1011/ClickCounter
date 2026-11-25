@@ -272,9 +272,11 @@ namespace KeyRank
                 badge, rc, Theme.CenterAll);
 
             Size labelSize = TextRenderer.MeasureText(stat.Label, Theme.BoldFont);
-            int capW = Math.Min(S(128), Math.Max(S(34), labelSize.Width + S(16)));
+            int capColumn = S(104);
+            int capW = Math.Min(S(96), Math.Max(S(34), labelSize.Width + S(16)));
             int capH = S(28);
-            Rectangle cap = new Rectangle(S(40), row.Y + (row.Height - capH) / 2, capW, capH);
+            int capX = S(40) + (capColumn - capW) / 2;
+            Rectangle cap = new Rectangle(capX, row.Y + (row.Height - capH) / 2, capW, capH);
             Theme.FillRound(g, cap, S(8), Color.FromArgb(27, 32, 42));
             Theme.StrokeRound(g, cap, S(8), Theme.Stroke);
             TextRenderer.DrawText(g, stat.Label, Theme.BoldFont, cap, Theme.Text, Theme.CenterAll);
@@ -288,7 +290,7 @@ namespace KeyRank
             Rectangle pctRect = new Rectangle(rightX, row.Y + row.Height / 2 + S(1), countW, S(13));
             TextRenderer.DrawText(g, pct.ToString("0.0") + "%", Theme.SmallFont, pctRect, Theme.Dim, Theme.RightCenter);
 
-            int barX = cap.Right + S(12);
+            int barX = S(40) + capColumn + S(12);
             int barRight = row.Width - countW - S(18);
             if (barRight - barX > S(24))
             {
