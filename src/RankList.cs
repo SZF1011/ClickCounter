@@ -33,7 +33,7 @@ namespace KeyRank
         public void SetScale(float s)
         {
             scale = s <= 0f ? 1f : s;
-            RowHeight = S(38);
+            RowHeight = S(34);
             offset = ClampOffset(offset);
             Invalidate();
         }
@@ -263,8 +263,8 @@ namespace KeyRank
                 Theme.FillRound(g, hr, S(10), Theme.BgAlt);
             }
 
-            int d = S(24);
-            Rectangle badge = new Rectangle(S(6), row.Y + (row.Height - d) / 2, d, d);
+            int d = S(20);
+            Rectangle badge = new Rectangle(S(4), row.Y + (row.Height - d) / 2, d, d);
             Color rc = index == 0 ? Theme.Gold : index == 1 ? Theme.Silver : index == 2 ? Theme.Bronze : Theme.Muted;
             Color rf = index <= 2 ? Theme.Alpha(rc, 34) : Color.FromArgb(27, 32, 42);
             using (SolidBrush b = new SolidBrush(rf)) g.FillEllipse(b, badge);
@@ -272,29 +272,29 @@ namespace KeyRank
                 badge, rc, Theme.CenterAll);
 
             Size labelSize = TextRenderer.MeasureText(stat.Label, Theme.BoldFont);
-            int capColumn = S(104);
-            int capW = Math.Min(S(96), Math.Max(S(34), labelSize.Width + S(16)));
-            int capH = S(28);
-            int capX = S(40) + (capColumn - capW) / 2;
+            int capColumn = S(84);
+            int capW = Math.Min(S(78), Math.Max(S(30), labelSize.Width + S(14)));
+            int capH = S(24);
+            int capX = S(28) + (capColumn - capW) / 2;
             Rectangle cap = new Rectangle(capX, row.Y + (row.Height - capH) / 2, capW, capH);
             Theme.FillRound(g, cap, S(8), Color.FromArgb(27, 32, 42));
             Theme.StrokeRound(g, cap, S(8), Theme.Stroke);
             TextRenderer.DrawText(g, stat.Label, Theme.BoldFont, cap, Theme.Text, Theme.CenterAll);
 
-            int countW = S(88);
-            int rightX = row.Width - countW - S(8);
-            Rectangle countRect = new Rectangle(rightX, row.Y + row.Height / 2 - S(15), countW, S(15));
+            int countW = S(66);
+            int rightX = row.Width - countW - S(6);
+            Rectangle countRect = new Rectangle(rightX, row.Y + row.Height / 2 - S(14), countW, S(14));
             TextRenderer.DrawText(g, stat.Count.ToString("N0"), Theme.CountFont, countRect, Theme.Text, Theme.RightCenter);
 
             double pct = totalClicks > 0 ? stat.Count * 100.0 / totalClicks : 0.0;
             Rectangle pctRect = new Rectangle(rightX, row.Y + row.Height / 2 + S(1), countW, S(13));
             TextRenderer.DrawText(g, pct.ToString("0.0") + "%", Theme.SmallFont, pctRect, Theme.Dim, Theme.RightCenter);
 
-            int barX = S(40) + capColumn + S(12);
-            int barRight = row.Width - countW - S(18);
-            if (barRight - barX > S(24))
+            int barX = S(28) + capColumn + S(8);
+            int barRight = row.Width - countW - S(12);
+            if (barRight - barX > S(20))
             {
-                int barH = S(6);
+                int barH = S(5);
                 int barY = row.Y + (row.Height - barH) / 2;
                 Rectangle track = new Rectangle(barX, barY, barRight - barX, barH);
                 Theme.FillRound(g, track, barH / 2, Theme.Track);
