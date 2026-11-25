@@ -20,9 +20,12 @@ namespace KeyRank
         readonly Dictionary<string, long> counts = new Dictionary<string, long>();
         readonly string dataDir;
         readonly string filePath;
+        readonly string historyDir;
+        readonly Dictionary<string, long> todayByKey = new Dictionary<string, long>();
 
         long total;
         long today;
+        long todayWheel;
         DateTime day;
         bool dirty;
         string loadWarning;
@@ -42,6 +45,7 @@ namespace KeyRank
             dataDir = dir;
             Directory.CreateDirectory(dataDir);
             filePath = Path.Combine(dataDir, "stats.tsv");
+            historyDir = Path.Combine(dataDir, "history");
             day = DateTime.Today;
             Load();
         }
@@ -91,10 +95,27 @@ namespace KeyRank
             DateTime now = DateTime.Today;
             if (day != now)
             {
+                FlushDayLocked(day);
                 day = now;
                 today = 0;
+                todayWheel = 0;
                 dirty = true;
             }
+        }
+
+        void FlushDayLocked(DateTime finishedDay)
+        {
+            if (finishedDay.Date == DateTime.Today) return;
+            if (todayByKey.Count == 0) return;
+            try
+            {
+                WriteDayFile(finishedDay, todayByKey, today);
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+            }
+            todayByKey.Clear();
         }
 
         public void Record(string id)
@@ -108,6 +129,10 @@ namespace KeyRank
                 else counts[id] = 1;
                 total++;
                 today++;
+                long t;
+                if (todayByKey.TryGetValue(id, out t)) todayByKey[id] = t + 1;
+                else todayByKey[id] = 1;
+                if (KeyCatalog.KindOf(id) == HitKind.Wheel) todayWheel++;
                 dirty = true;
             }
         }
@@ -121,19 +146,27 @@ namespace KeyRank
             }
         }
 
-        public void GetSummary(out long totalCount, out long todayCount, out long mouseCount)
+        public void GetSummary(out long totalCount, out long todayCount, out long mouseCount,
+            out long wheelCount, out long todayWheelCount)
         {
             lock (gate)
             {
                 RollDayLocked();
-                totalCount = total;
-                todayCount = today;
-                long m = 0;
+
+                long wheel = 0;
+                long mouse = 0;
                 foreach (KeyValuePair<string, long> kv in counts)
                 {
-                    if (kv.Key == "M_L" || kv.Key == "M_R") m += kv.Value;
+                    HitKind kind = KeyCatalog.KindOf(kv.Key);
+                    if (kind == HitKind.Wheel) { wheel += kv.Value; continue; }
+                    if (kv.Key == "M_L" || kv.Key == "M_R") mouse += kv.Value;
                 }
-                mouseCount = m;
+
+                totalCount = total - wheel;
+                todayCount = today - todayWheel;
+                mouseCount = mouse;
+                wheelCount = wheel;
+                todayWheelCount = todayWheel;
             }
         }
 
@@ -185,25 +218,34 @@ namespace KeyRank
             lock (gate)
             {
                 counts.Clear();
+                todayByKey.Clear();
                 total = 0;
                 today = 0;
+                todayWheel = 0;
                 day = DateTime.Today;
                 dirty = true;
+                TryDeleteDayFile(DateTime.Today);
             }
         }
 
         public bool Save()
         {
             List<KeyValuePair<string, long>> snap;
+            Dictionary<string, long> daySnapshot;
+            DateTime snapshotDay;
             long tot;
             long td;
+            long tdWheel;
             string dayText;
             lock (gate)
             {
                 RollDayLocked();
                 snap = new List<KeyValuePair<string, long>>(counts);
+                daySnapshot = new Dictionary<string, long>(todayByKey);
+                snapshotDay = day;
                 tot = total;
                 td = today;
+                tdWheel = todayWheel;
                 dayText = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 dirty = false;
             }
@@ -217,6 +259,7 @@ namespace KeyRank
             sb.AppendLine("# KeyRank v1");
             sb.Append("day\t").Append(dayText).AppendLine();
             sb.Append("daycount\t").Append(td.ToString(CultureInfo.InvariantCulture)).AppendLine();
+            sb.Append("daywheel\t").Append(tdWheel.ToString(CultureInfo.InvariantCulture)).AppendLine();
             sb.Append("total\t").Append(tot.ToString(CultureInfo.InvariantCulture)).AppendLine();
             foreach (KeyValuePair<string, long> kv in snap)
             {
@@ -231,6 +274,14 @@ namespace KeyRank
                 if (File.Exists(filePath)) File.Replace(tmp, filePath, null);
                 else File.Move(tmp, filePath);
                 LastError = null;
+                try
+                {
+                    WriteDayFile(snapshotDay, daySnapshot, td);
+                }
+                catch (Exception dayEx)
+                {
+                    LastError = dayEx.Message;
+                }
                 return true;
             }
             catch (Exception ex)
@@ -251,14 +302,17 @@ namespace KeyRank
                 long tot;
                 long td;
                 long mouse;
-                GetSummary(out tot, out td, out mouse);
+                long wheel;
+                long todayWheel;
+                GetSummary(out tot, out td, out mouse, out wheel, out todayWheel);
 
                 StringBuilder sb = new StringBuilder(rows.Count * 32 + 96);
                 sb.AppendLine("名次,按键,类型,次数,占比");
                 int rank = 1;
                 foreach (KeyStat s in rows)
                 {
-                    double pct = tot > 0 ? (s.Count * 100.0 / tot) : 0.0;
+                    long baseTotal = s.Kind == HitKind.Wheel ? wheel : tot;
+                    double pct = baseTotal > 0 ? (s.Count * 100.0 / baseTotal) : 0.0;
                     sb.Append(rank.ToString(CultureInfo.InvariantCulture)).Append(',');
                     sb.Append(CsvField(s.Label)).Append(',');
                     string kindText = s.Kind == HitKind.Mouse ? "鼠标" : (s.Kind == HitKind.Wheel ? "滚轮" : "键盘");
@@ -284,6 +338,220 @@ namespace KeyRank
             return s;
         }
 
+        public string HistoryDir { get { return historyDir; } }
+
+        string DayFilePath(DateTime target)
+        {
+            return Path.Combine(historyDir, target.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + ".tsv");
+        }
+
+        void TryDeleteDayFile(DateTime target)
+        {
+            try
+            {
+                string path = DayFilePath(target);
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch
+            {
+            }
+        }
+
+        void WriteDayFile(DateTime target, Dictionary<string, long> map, long dayTotal)
+        {
+            if (map == null || map.Count == 0) return;
+            if (dayTotal <= 0)
+            {
+                dayTotal = 0;
+                foreach (KeyValuePair<string, long> kv in map) dayTotal += kv.Value;
+            }
+
+            string path = DayFilePath(target);
+            if (target.Date != DateTime.Today && File.Exists(path)) return;
+
+            List<KeyValuePair<string, long>> list = new List<KeyValuePair<string, long>>(map);
+            list.Sort(delegate(KeyValuePair<string, long> a, KeyValuePair<string, long> b)
+            {
+                return string.CompareOrdinal(a.Key, b.Key);
+            });
+
+            StringBuilder sb = new StringBuilder(list.Count * 10 + 48);
+            sb.AppendLine("# KeyRank day v1");
+            sb.Append("day\t").Append(target.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).AppendLine();
+            sb.Append("total\t").Append(dayTotal.ToString(CultureInfo.InvariantCulture)).AppendLine();
+            foreach (KeyValuePair<string, long> kv in list)
+            {
+                if (kv.Value <= 0) continue;
+                sb.Append(kv.Key).Append('\t').Append(kv.Value.ToString(CultureInfo.InvariantCulture)).AppendLine();
+            }
+
+            Directory.CreateDirectory(historyDir);
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, sb.ToString(), new UTF8Encoding(false));
+            if (File.Exists(path)) File.Replace(tmp, path, null);
+            else File.Move(tmp, path);
+        }
+
+        Dictionary<string, long> ReadDayFile(DateTime target)
+        {
+            Dictionary<string, long> map = new Dictionary<string, long>();
+            try
+            {
+                string path = DayFilePath(target);
+                if (!File.Exists(path)) return map;
+
+                string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+                foreach (string raw in lines)
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0 || line[0] == '#') continue;
+                    int tab = line.IndexOf('\t');
+                    if (tab <= 0) continue;
+                    string key = line.Substring(0, tab).Trim();
+                    string value = line.Substring(tab + 1).Trim();
+                    if (key == "day" || key == "total") continue;
+                    long n;
+                    if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out n) && n > 0)
+                        map[key] = n;
+                }
+            }
+            catch
+            {
+            }
+            return map;
+        }
+
+        Dictionary<string, long> SnapshotFor(DateTime target, out long dayTotal)
+        {
+            lock (gate)
+            {
+                RollDayLocked();
+                if (target.Date == day.Date)
+                {
+                    dayTotal = today;
+                    return new Dictionary<string, long>(todayByKey);
+                }
+            }
+
+            Dictionary<string, long> map = ReadDayFile(target);
+            long sum = 0;
+            foreach (KeyValuePair<string, long> kv in map) sum += kv.Value;
+            dayTotal = sum;
+            return map;
+        }
+
+        public List<DateTime> GetHistoryDays()
+        {
+            List<DateTime> days = new List<DateTime>();
+            HashSet<DateTime> seen = new HashSet<DateTime>();
+            try
+            {
+                if (Directory.Exists(historyDir))
+                {
+                    foreach (string file in Directory.GetFiles(historyDir, "*.tsv"))
+                    {
+                        DateTime parsed;
+                        string name = Path.GetFileNameWithoutExtension(file);
+                        if (DateTime.TryParseExact(name, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                            DateTimeStyles.None, out parsed))
+                        {
+                            if (seen.Add(parsed.Date)) days.Add(parsed.Date);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            if (seen.Add(DateTime.Today)) days.Add(DateTime.Today);
+            days.Sort();
+            return days;
+        }
+
+        public List<KeyStat> BuildDayRows(DateTime target, bool includeKeyboard, bool includeMouse, bool includeWheel)
+        {
+            long dayTotal;
+            Dictionary<string, long> map = SnapshotFor(target, out dayTotal);
+
+            List<KeyStat> rows = new List<KeyStat>(map.Count);
+            foreach (KeyValuePair<string, long> kv in map)
+            {
+                if (kv.Value <= 0) continue;
+                HitKind kind = KeyCatalog.KindOf(kv.Key);
+                if (kind == HitKind.Mouse && !includeMouse) continue;
+                if (kind == HitKind.Wheel && !includeWheel) continue;
+                if (kind == HitKind.Keyboard && !includeKeyboard) continue;
+
+                KeyStat s = new KeyStat();
+                s.Id = kv.Key;
+                s.Label = KeyCatalog.Label(kv.Key);
+                s.Kind = kind;
+                s.Count = kv.Value;
+                rows.Add(s);
+            }
+            rows.Sort(CompareRows);
+            return rows;
+        }
+
+        public long GetDayTotal(DateTime target)
+        {
+            return GetDayTotal(target, false);
+        }
+
+        public long GetDayTotal(DateTime target, bool includeWheel)
+        {
+            long dayTotal;
+            Dictionary<string, long> map = SnapshotFor(target, out dayTotal);
+            if (includeWheel) return dayTotal;
+
+            long sum = 0;
+            foreach (KeyValuePair<string, long> kv in map)
+            {
+                if (KeyCatalog.KindOf(kv.Key) == HitKind.Wheel) continue;
+                sum += kv.Value;
+            }
+            return sum;
+        }
+
+        public bool DayHasData(DateTime target)
+        {
+            long dayTotal;
+            Dictionary<string, long> map = SnapshotFor(target, out dayTotal);
+            return map.Count > 0;
+        }
+
+        public bool ExportDayCsv(DateTime target, string path, out string error)
+        {
+            error = null;
+            try
+            {
+                long dayTotal = GetDayTotal(target);
+                long dayWheel = GetDayTotal(target, true) - dayTotal;
+                List<KeyStat> rows = BuildDayRows(target, true, true, true);
+                StringBuilder sb = new StringBuilder(rows.Count * 32 + 96);
+                sb.AppendLine("名次,按键,类型,次数,占比");
+                int rank = 1;
+                foreach (KeyStat s in rows)
+                {
+                    long baseTotal = s.Kind == HitKind.Wheel ? dayWheel : dayTotal;
+                    double pct = baseTotal > 0 ? (s.Count * 100.0 / baseTotal) : 0.0;
+                    sb.Append(rank.ToString(CultureInfo.InvariantCulture)).Append(',');
+                    sb.Append(CsvField(s.Label)).Append(',');
+                    string kindText = s.Kind == HitKind.Mouse ? "鼠标" : (s.Kind == HitKind.Wheel ? "滚轮" : "键盘");
+                    sb.Append(kindText).Append(',');
+                    sb.Append(s.Count.ToString(CultureInfo.InvariantCulture)).Append(',');
+                    sb.Append(pct.ToString("0.0", CultureInfo.InvariantCulture)).AppendLine("%");
+                    rank++;
+                }
+                return FileExport.WriteTextFile(path, sb.ToString(), dataDir, out error);
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
         void Load()
         {
             if (!File.Exists(filePath)) return;
@@ -294,6 +562,7 @@ namespace KeyRank
                 Dictionary<string, long> loaded = new Dictionary<string, long>();
                 DateTime loadedDay = DateTime.Today;
                 long loadedToday = 0;
+                long loadedTodayWheel = 0;
                 long loadedTotal = -1;
 
                 foreach (string raw in source)
@@ -310,6 +579,11 @@ namespace KeyRank
                         DateTime parsed;
                         if (DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                             DateTimeStyles.None, out parsed)) loadedDay = parsed;
+                    }
+                    else if (key == "daywheel")
+                    {
+                        long n;
+                        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) loadedTodayWheel = n;
                     }
                     else if (key == "daycount")
                     {
@@ -333,13 +607,23 @@ namespace KeyRank
                 foreach (KeyValuePair<string, long> kv in loaded) sum += kv.Value;
                 if (loadedTotal < 0) loadedTotal = sum;
 
+                Dictionary<string, long> restoredToday = null;
+                if (loadedDay.Date == DateTime.Today && loadedToday > 0)
+                    restoredToday = ReadDayFile(loadedDay);
+
                 lock (gate)
                 {
                     counts.Clear();
                     foreach (KeyValuePair<string, long> kv in loaded) counts[kv.Key] = kv.Value;
                     total = loadedTotal;
                     today = loadedToday;
+                    todayWheel = loadedTodayWheel;
                     day = loadedDay;
+                    todayByKey.Clear();
+                    if (restoredToday != null)
+                    {
+                        foreach (KeyValuePair<string, long> kv in restoredToday) todayByKey[kv.Key] = kv.Value;
+                    }
                     RollDayLocked();
                 }
             }
@@ -352,6 +636,7 @@ namespace KeyRank
                     counts.Clear();
                     total = 0;
                     today = 0;
+                    todayWheel = 0;
                     day = DateTime.Today;
                 }
             }

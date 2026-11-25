@@ -22,7 +22,7 @@ echo [3/3] building dist\ClickCounter.exe...
 "%CSC%" /nologo /codepage:65001 /target:winexe /optimize+ /platform:anycpu /win32icon:app.ico ^
   /out:dist\ClickCounter.exe /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll ^
   src\Theme.cs src\KeyCatalog.cs src\StatsStore.cs src\InputLog.cs src\InputHook.cs src\Controls.cs ^
-  src\RankList.cs src\ConfirmReset.cs src\SaveAsForm.cs src\FileExport.cs src\KeyLogForm.cs src\TraySupport.cs src\MainForm.cs src\Program.cs || exit /b 1
+  src\RankList.cs src\ConfirmReset.cs src\SaveAsForm.cs src\FileExport.cs src\KeyLogForm.cs src\HistoryForm.cs src\TraySupport.cs src\MainForm.cs src\Program.cs || exit /b 1
 
 echo.
 echo Build OK: dist\ClickCounter.exe

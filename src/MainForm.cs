@@ -38,6 +38,8 @@ namespace KeyRank
         PillButton btnLog;
         PillButton btnExport;
         PillButton btnSettings;
+        PillButton btnHistory;
+        HistoryForm historyForm;
         ToolTip tips;
 
         bool paused;
@@ -50,6 +52,7 @@ namespace KeyRank
         int saveTicks;
         long lastTotal = -1;
         long lastMouse = -1;
+        long lastWheel = -1;
         List<KeyStat> lastRows = new List<KeyStat>();
         float uiScale = 1f;
         Icon appIcon;
@@ -151,6 +154,12 @@ namespace KeyRank
             btnSettings = MakeButton("\uE713", "设置", false);
             btnSettings.Click += delegate { ShowSettingsMenu(); };
 
+            btnHistory = new PillButton();
+            btnHistory.Text = "历史";
+            btnHistory.Font = Theme.SmallFont;
+            tips.SetToolTip(btnHistory, "历史排行（按天查看，Ctrl+H）");
+            btnHistory.Click += delegate { OpenHistory(); };
+
             lblStatus = MakeLabel("", Theme.SmallFont, Theme.Muted, ContentAlignment.MiddleLeft);
             lblStatus.AutoEllipsis = true;
 
@@ -167,6 +176,7 @@ namespace KeyRank
             Controls.Add(btnLog);
             Controls.Add(btnExport);
             Controls.Add(btnSettings);
+            Controls.Add(btnHistory);
         }
 
         Label MakeLabel(string text, Font font, Color color, ContentAlignment align)
@@ -270,6 +280,7 @@ namespace KeyRank
             lblTitle.Bounds = new Rectangle(pad, S(6), Math.Max(S(120), w - pad - S(100)), S(26));
             lblSubtitle.Bounds = new Rectangle(pad + S(2), S(34), Math.Max(S(120), w - pad * 2), S(16));
             pill.Bounds = new Rectangle(w - pad - S(80), S(10), S(80), S(22));
+            btnHistory.Bounds = new Rectangle(w - pad - S(80) - S(8) - S(56), S(8), S(56), S(26));
 
             card.Bounds = new Rectangle(pad, S(54), Math.Max(S(200), w - pad * 2), S(56));
 
@@ -359,7 +370,9 @@ namespace KeyRank
             long total;
             long today;
             long mouse;
-            store.GetSummary(out total, out today, out mouse);
+            long wheel;
+            long todayWheel;
+            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
             UpdateTrayText(total, today, mouse);
         }
 
@@ -368,9 +381,11 @@ namespace KeyRank
             long total;
             long today;
             long mouse;
-            store.GetSummary(out total, out today, out mouse);
+            long wheel;
+            long todayWheel;
+            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
 
-            if (total != lastTotal || mouse != lastMouse) RefreshRows();
+            if (total != lastTotal || mouse != lastMouse || wheel != lastWheel) RefreshRows();
 
             if (store.IsDirty)
             {
@@ -395,7 +410,9 @@ namespace KeyRank
             long total;
             long today;
             long mouse;
-            store.GetSummary(out total, out today, out mouse);
+            long wheel;
+            long todayWheel;
+            store.GetSummary(out total, out today, out mouse, out wheel, out todayWheel);
 
             List<KeyStat> rows = store.BuildRows(showKeyboard, showMouse, showWheel, search.Query);
             if (rows.Count == 0)
@@ -405,27 +422,31 @@ namespace KeyRank
                 else list.SetEmptyMessage("这个分类还没有记录", "切换筛选看看其他按键");
             }
 
-            list.SetItems(rows, total);
+            list.SetItems(rows, showWheel ? wheel : total);
             card.Total = total;
             card.Today = today;
             card.MousePercent = total > 0 ? mouse * 100.0 / total : 0.0;
+            card.Wheel = wheel;
+            card.TodayWheel = todayWheel;
             card.Invalidate();
 
             lastTotal = total;
             lastMouse = mouse;
+            lastWheel = wheel;
             lastRows = rows;
-            UpdateFooter(total, today, mouse);
+            UpdateFooter(total, today, mouse, wheel);
             UpdateTrayText(total, today, mouse);
         }
 
-        void UpdateFooter(long total, long today, long mouse)
+        void UpdateFooter(long total, long today, long mouse, long wheel)
         {
             if (paused)
             {
                 SetStatus("已暂停 · 已记录 " + total.ToString("N0") + " 次", false);
                 return;
             }
-            string text = "已记录 " + total.ToString("N0") + " · 今日 " + today.ToString("N0") + " · 鼠标 " + mouse.ToString("N0");
+            string text = "已记录 " + total.ToString("N0") + " · 今日 " + today.ToString("N0") +
+                " · 鼠标 " + mouse.ToString("N0") + " · 滚轮 " + wheel.ToString("N0") + "（独立）";
             SetStatus(text, false);
         }
 
@@ -534,6 +555,28 @@ namespace KeyRank
             using (KeyLogForm form = new KeyLogForm(inputLog, DateTime.Today))
             {
                 form.ShowDialog(this);
+            }
+        }
+
+        void OpenHistory()
+        {
+            try
+            {
+                if (historyForm != null && !historyForm.IsDisposed)
+                {
+                    if (historyForm.WindowState == FormWindowState.Minimized)
+                        historyForm.WindowState = FormWindowState.Normal;
+                    historyForm.Activate();
+                    return;
+                }
+
+                historyForm = new HistoryForm(store, DateTime.Today);
+                historyForm.FormClosed += delegate { historyForm = null; };
+                historyForm.Show(this);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("无法打开历史排行：" + ex.Message, true);
             }
         }
 
@@ -658,6 +701,10 @@ namespace KeyRank
             keyLog.Click += delegate { OpenKeyLog(); };
             menu.Items.Add(keyLog);
 
+            ToolStripMenuItem history = new ToolStripMenuItem("历史排行（按天）…");
+            history.Click += delegate { OpenHistory(); };
+            menu.Items.Add(history);
+
             ToolStripMenuItem logFolder = new ToolStripMenuItem("打开日志文件夹");
             logFolder.Click += delegate { OpenLogFolder(); };
             menu.Items.Add(logFolder);
@@ -685,9 +732,10 @@ namespace KeyRank
 
         void ShowAbout()
         {
-            string text = "KeyRank 1.0.0\n\n" +
+            string text = "KeyRank 1.1.0\n\n" +
                 "统计每个按键与鼠标左/右键的点击次数；同时在本机记录每次按键的时间与顺序，" +
                 "可在“按键记录”里按 5 分钟一段查看。不记录输入的文字内容。\n\n" +
+                "每天自动留存一份排行快照，可在主界面「历史」（Ctrl+H）里按天查看。\n\n" +
                 "数据文件：\n" + store.FilePath + "\n日志目录：\n" + (inputLog == null ? "（不可用）" : inputLog.Dir) + "\n\n" +
                 "普通权限下无法统计以管理员身份运行的窗口；右键以管理员身份运行本程序即可完整统计。\n\n" +
                 "关闭窗口会最小化到托盘并继续计数，右键托盘图标可退出。";
@@ -813,6 +861,7 @@ namespace KeyRank
             if (keyData == (Keys.Control | Keys.P)) { TogglePause(); return true; }
             if (keyData == (Keys.Control | Keys.R)) { ResetCounts(); return true; }
             if (keyData == (Keys.Control | Keys.L)) { OpenKeyLog(); return true; }
+            if (keyData == (Keys.Control | Keys.H)) { OpenHistory(); return true; }
             if (!search.ContainsFocus)
             {
                 if (keyData == Keys.Down) { list.ScrollBy(S(28)); return true; }
