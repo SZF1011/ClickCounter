@@ -162,10 +162,7 @@ namespace KeyRank
             btnSettings = MakeButton("\uE713", "设置", false);
             btnSettings.Click += delegate { ShowSettingsMenu(); };
 
-            btnHistory = new PillButton();
-            btnHistory.Text = "历史";
-            btnHistory.Font = Theme.SmallFont;
-            tips.SetToolTip(btnHistory, "历史排行（按天查看，Ctrl+H）");
+            btnHistory = MakeButton("\uE787", "历史排行（按天查看，Ctrl+H）", false);
             btnHistory.Click += delegate { OpenHistory(); };
 
             lblStatus = MakeLabel("", Theme.SmallFont, Theme.Muted, ContentAlignment.MiddleLeft);
@@ -288,7 +285,6 @@ namespace KeyRank
             lblTitle.Bounds = new Rectangle(pad, S(6), Math.Max(S(120), w - pad - S(100)), S(26));
             lblSubtitle.Bounds = new Rectangle(pad + S(2), S(34), Math.Max(S(120), w - pad * 2), S(16));
             pill.Bounds = new Rectangle(w - pad - S(80), S(10), S(80), S(22));
-            btnHistory.Bounds = new Rectangle(w - pad - S(80) - S(8) - S(56), S(8), S(56), S(26));
 
             card.Bounds = new Rectangle(pad, S(54), Math.Max(S(200), w - pad * 2), S(56));
 
@@ -315,6 +311,8 @@ namespace KeyRank
             btnReset.Bounds = new Rectangle(bx, footerY, btn, btn);
             bx -= btn + btnGap;
             btnPause.Bounds = new Rectangle(bx, footerY, btn, btn);
+            bx -= btn + btnGap;
+            btnHistory.Bounds = new Rectangle(bx, footerY, btn, btn);
 
             lblStatus.Bounds = new Rectangle(pad, footerY + S(2), Math.Max(S(80), bx - pad - S(6)), S(24));
         }
@@ -454,7 +452,7 @@ namespace KeyRank
                 return;
             }
             string text = "已记录 " + total.ToString("N0") + " · 今日 " + today.ToString("N0") +
-                " · 鼠标 " + mouse.ToString("N0") + " · 滚轮 " + wheel.ToString("N0") + "（独立）";
+                " · 滚轮 " + wheel.ToString("N0");
             SetStatus(text, false);
         }
 
