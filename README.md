@@ -12,7 +12,7 @@ Windows 桌面小工具：全局统计每个按键与鼠标左/右键的点击�
 
 | 版本 | 文件 | 说明 |
 | --- | --- | --- |
-| v1.0.0 | [ClickCounter.exe](https://github.com/SZF1011/ClickCounter/releases/latest) | 单文件、免安装，双击即用；.NET Framework 4.8 为 Windows 自带 |
+| v1.1.1 | [ClickCounter.exe](https://github.com/SZF1011/ClickCounter/releases/latest) | 单文件、免安装，双击即用；主页显示今日排行，历史里可看累计 |
 
 首次运行 Windows 可能提示「已保护你的电脑」，点「更多信息 → 仍要运行」；程序会请求管理员权限（UAC），这样托盘图标、开机自启和任意目录导出才可用。
 
