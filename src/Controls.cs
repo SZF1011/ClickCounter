@@ -239,13 +239,15 @@ namespace KeyRank
                 Wheel.ToString("N0")
             };
 
+            int labelH = TextRenderer.MeasureText("今日", Theme.SmallFont).Height;
+            int valueH = TextRenderer.MeasureText("1,234", Theme.NumFont).Height;
+            int top = Math.Max(2, (Height - labelH - valueH) / 2);
+
             int colW = Width / 3;
             for (int i = 0; i < 3; i++)
             {
                 Rectangle cell = new Rectangle(i * colW, 0, colW, Height);
-                int labelH = (int)(Height * 0.2);
-                int valueH = (int)(Height * 0.44);
-                int labelY = (int)(Height * 0.18);
+                int labelY = top;
                 TextRenderer.DrawText(g, labels[i], Theme.SmallFont,
                     new Rectangle(cell.X, labelY, cell.Width, labelH), Theme.Muted,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);

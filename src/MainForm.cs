@@ -216,8 +216,8 @@ namespace KeyRank
             if (uiScale < 0.75f) uiScale = 0.75f;
             if (uiScale > 2.5f) uiScale = 2.5f;
 
-            ClientSize = new Size(S(400), S(560));
-            MinimumSize = new Size(S(360), S(460));
+            ClientSize = new Size(S(360), S(500));
+            MinimumSize = new Size(S(320), S(420));
 
             Rectangle wa = Screen.FromHandle(Handle).WorkingArea;
             int maxHeight = wa.Height - S(16);
@@ -281,26 +281,26 @@ namespace KeyRank
             int h = ClientSize.Height;
             if (w <= 0 || h <= 0) return;
 
-            int pad = S(12);
+            int pad = S(10);
             lblTitle.Bounds = new Rectangle(pad, S(4), Math.Max(S(120), w - pad - S(100)), S(24));
             lblSubtitle.Bounds = new Rectangle(pad + S(2), S(29), Math.Max(S(120), w - pad * 2), S(14));
             pill.Bounds = new Rectangle(w - pad - S(76), S(7), S(76), S(20));
 
-            card.Bounds = new Rectangle(pad, S(47), Math.Max(S(200), w - pad * 2), S(50));
+            card.Bounds = new Rectangle(pad, S(43), Math.Max(S(200), w - pad * 2), S(48));
 
-            int segW = S(216);
+            int segW = S(196);
             int gap = S(6);
-            int searchW = Math.Max(S(110), w - pad * 2 - segW - gap);
-            seg.Bounds = new Rectangle(pad, S(103), segW, S(28));
-            search.Bounds = new Rectangle(w - pad - searchW, S(103), searchW, S(28));
+            int searchW = Math.Max(S(96), w - pad * 2 - segW - gap);
+            seg.Bounds = new Rectangle(pad, S(94), segW, S(26));
+            search.Bounds = new Rectangle(w - pad - searchW, S(94), searchW, S(26));
 
-            int footerY = h - S(34);
-            int listTop = S(139);
-            int listBottom = h - S(44);
+            int footerY = h - S(30);
+            int listTop = S(126);
+            int listBottom = h - S(40);
             list.Bounds = new Rectangle(pad, listTop, Math.Max(S(200), w - pad * 2), Math.Max(S(100), listBottom - listTop));
 
-            int btn = S(26);
-            int btnGap = S(4);
+            int btn = S(24);
+            int btnGap = S(3);
             int bx = w - pad - btn;
             btnSettings.Bounds = new Rectangle(bx, footerY, btn, btn);
             bx -= btn + btnGap;

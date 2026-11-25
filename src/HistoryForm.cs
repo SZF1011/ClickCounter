@@ -50,8 +50,8 @@ namespace KeyRank
             AutoScaleMode = AutoScaleMode.None;
             DoubleBuffered = true;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(440, 560);
-            MinimumSize = new Size(380, 420);
+            ClientSize = new Size(360, 470);
+            MinimumSize = new Size(320, 380);
             KeyPreview = true;
 
             titleLabel = NewLabel("历史排行", Theme.H1Font, Theme.Text);
@@ -136,8 +136,8 @@ namespace KeyRank
             if (uiScale < 0.75f) uiScale = 0.75f;
             if (uiScale > 2.5f) uiScale = 2.5f;
 
-            ClientSize = new Size(S(440), S(560));
-            MinimumSize = new Size(S(380), S(420));
+            ClientSize = new Size(S(360), S(470));
+            MinimumSize = new Size(S(320), S(380));
 
             try
             {
@@ -168,12 +168,12 @@ namespace KeyRank
             int h = ClientSize.Height;
             if (w <= 0 || h <= 0) return;
 
-            int pad = S(14);
-            titleLabel.Bounds = new Rectangle(pad, S(8), Math.Max(S(120), w - pad * 2), S(24));
-            subtitleLabel.Bounds = new Rectangle(pad, S(32), Math.Max(S(120), w - pad * 2), S(16));
+            int pad = S(10);
+            titleLabel.Bounds = new Rectangle(pad, S(5), Math.Max(S(110), w - pad * 2), S(20));
+            subtitleLabel.Bounds = new Rectangle(pad, S(25), Math.Max(S(110), w - pad * 2), S(13));
 
-            int navY = S(56);
-            int navH = S(28);
+            int navY = S(43);
+            int navH = S(24);
 
             int exportW = S(76);
             int exportX = Math.Max(pad + S(150), w - pad - exportW);
@@ -192,12 +192,12 @@ namespace KeyRank
             totalButton.Bounds = new Rectangle(totalX, navY, totalW, navH);
             exportButton.Bounds = new Rectangle(exportX, navY, exportW, navH);
 
-            int listTop = S(94);
-            int listBottom = h - S(46);
+            int listTop = S(76);
+            int listBottom = h - S(38);
             list.Bounds = new Rectangle(pad, listTop, Math.Max(S(160), w - pad * 2), Math.Max(S(80), listBottom - listTop));
 
-            statusLabel.Bounds = new Rectangle(pad, h - S(34), Math.Max(S(100), w - pad * 2 - S(76)), S(24));
-            closeButton.Bounds = new Rectangle(w - pad - S(64), h - S(36), S(64), S(28));
+            statusLabel.Bounds = new Rectangle(pad, h - S(27), Math.Max(S(90), w - pad * 2 - S(66)), S(20));
+            closeButton.Bounds = new Rectangle(w - pad - S(56), h - S(29), S(56), S(24));
         }
 
         void LoadDays()
